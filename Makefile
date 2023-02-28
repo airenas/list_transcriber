@@ -23,10 +23,13 @@ ${work_dir}/files.list: ${work_dir}/extracted/.done
 	find ${extr_dir} -name "*.mp3" > $@	
 ############################################
 ${work_dir}/.done: ${work_dir}/files.list | ${work_dir}/trans
-	$(python_cmd) src/predict.py --in_f $^ --out_dir ${work_dir}/trans --url $(tr_url)
+	$(python_cmd) src/predict.py --in_f $^ --out_dir ${work_dir}/trans --url $(tr_url) --workers ${workers} \
+		--key ${key}
 	touch $@
+${work_dir}/trans.zip: ${work_dir}/.done
+	cd ${work_dir} && zip -r trans.zip trans
 ############################################
-build: ${work_dir}/.done
+build: ${work_dir}/trans.zip
 ############################################
 clean:
 	@echo -n "Drop $(work_dir)? Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]

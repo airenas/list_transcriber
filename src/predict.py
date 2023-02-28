@@ -28,7 +28,12 @@ class Work:
         self.done()
 
 
+err_lock = threading.Lock()
+err_count = 0
+
+
 def predict(trans, file, file_out):
+    global err_count
     if exists(file_out):
         file_stats = os.stat(file_out)
         if file_stats and file_stats.st_size > 0:
@@ -39,6 +44,8 @@ def predict(trans, file, file_out):
         with open(file_out, "w") as f:
             f.write(str)
     except BaseException as err:
+        with err_lock:
+            err_count += 1
         return "error {}".format(err)
     return "{} - done".format(file_out)
 
@@ -106,7 +113,13 @@ def main(argv):
             print("%s" % (j.str.replace("\n", " ")))
     for w in workers:
         w.join()
+    with err_lock:
+        if err_count > 0:
+            print("Failed %d" % err_count)
+            return 1
+        print("DONE")
+        return 0
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))
