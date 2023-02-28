@@ -20,7 +20,7 @@ ${work_dir}/extracted/.done: ${data_in} | ${work_dir}/extracted
 	touch $@
 ############################################
 ${work_dir}/files.list: ${work_dir}/extracted/.done
-	find ${extr_dir} -name "*.mp3" > $@	
+	find ${work_dir}/extracted/${extr_dir} -name "*.mp3" > $@
 ############################################
 ${work_dir}/.done: ${work_dir}/files.list | ${work_dir}/trans
 	$(python_cmd) src/predict.py --in_f $^ --out_dir ${work_dir}/trans --url $(tr_url) --workers ${workers} \
