@@ -11,9 +11,10 @@ from src.transcriber import Transcriber
 
 
 class Work:
-    def __init__(self, file: str, file_out: str):
+    def __init__(self, file: str, file_out: str, file_out_sync: str):
         self.file = file
         self.file_out = file_out
+        self.file_out_sync = file_out_sync
         self.wait_queue = queue.Queue(maxsize=1)
         self.str = ""
 
@@ -24,7 +25,7 @@ class Work:
         return self.wait_queue.get()
 
     def predict(self, trans) -> str:
-        self.str = predict(trans, self.file, self.file_out)
+        self.str = predict(trans, self.file, self.file_out, self.file_out_sync)
         self.done()
 
 
@@ -32,21 +33,28 @@ err_lock = threading.Lock()
 err_count = 0
 
 
-def predict(trans, file, file_out):
-    global err_count
-    if exists(file_out):
-        file_stats = os.stat(file_out)
+def non_empty_file(file: str):
+    if exists(file):
+        file_stats = os.stat(file)
         if file_stats and file_stats.st_size > 0:
-            return "{} - exists".format(file_out)
+            return True
+
+
+def predict(trans, file, file_out, file_out_sync):
+    global err_count
+    if exists(file_out) and exists(file_out_sync):
+        return "{} - exists".format(file_out)
     try:
         print("sending file %s" % file)
-        str = trans.predict(file)
+        (txt, lat) = trans.predict(file)
         with open(file_out, "w") as f:
-            f.write(str)
+            f.write(txt)
+        with open(file_out_sync, "w") as f:
+            f.write(lat)
     except BaseException as err:
         with err_lock:
             err_count += 1
-        return "error {}".format(err)
+        return "    error {}".format(err)
     return "{} - done".format(file_out)
 
 
@@ -72,8 +80,8 @@ def main(argv):
             f = line
             _, fn = os.path.split(f)
             fn = os.path.splitext(fn)[0]
-            out_f = os.path.join(args.out_dir, fn + ".txt")
-            jobs.append(Work(f, out_f))
+            jobs.append(Work(f, file_out=os.path.join(args.out_dir, fn + ".txt"),
+                             file_out_sync=os.path.join(args.out_dir, fn + ".sync.txt")))
     print("URL    : {}".format(args.url))
     print("Workers: {}".format(args.workers))
     print("Files  : {}".format(len(jobs)))

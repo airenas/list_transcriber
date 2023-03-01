@@ -12,7 +12,7 @@ class Transcriber:
         rate = RequestRate(10, Duration.SECOND)
         self.limiter = Limiter(rate)
 
-    def predict(self, file: str) -> str:
+    def predict(self, file: str) -> (str, str):
         try:
             _id = self.upload(file)
             print("send " + _id)
@@ -21,17 +21,18 @@ class Transcriber:
                 finished = self.is_finished(_id)
                 if not finished:
                     time.sleep(1)
-            res = self.get_result(_id)
+            res = self.get_result(_id, "resultFinal.txt")
+            res_lat = self.get_result(_id, "lat.restored.txt")
             print("done " + _id)
             self.clean(_id)
             print("cleaned " + _id)
         except BaseException as err:
             raise err
-        return res
+        return res, res_lat
 
     def upload(self, file):
         with open(file, 'rb') as f:
-            files = {'file': (os.path.basename(file), f.read())}
+            files = {'file': (os.path.basename(file).replace("..", "."), f.read())}
         # values = {'recognizer': 'ben', 'numberOfSpeakers': '1'}
         values = {'recognizer': 'ben'}
         url = "%s/ausis/transcriber/upload" % self.__url
@@ -55,8 +56,8 @@ class Transcriber:
             raise Exception(st["error"])
         return st["status"] == "COMPLETED"
 
-    def get_result(self, _id):
-        url = "%s/ausis/result.service/result/%s/resultFinal.txt" % (self.__url, _id)
+    def get_result(self, _id: str, _file: str):
+        url = "%s/ausis/result.service/result/%s/%s" % (self.__url, _id, _file)
         self.rate_limit()
         r = requests.get(url, timeout=10)
         if r.status_code != 200:
