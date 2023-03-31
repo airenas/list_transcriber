@@ -5,9 +5,9 @@ API: https://app.swaggerhub.com/apis/aireno/Transkipcija
 
 ## Requirements
 
-- conda or python>=3.10
-- make
-- unzip
+- *conda* or *python>=3.10*
+- *make*
+- *unzip*, *zip*
 
 ## Running
 
