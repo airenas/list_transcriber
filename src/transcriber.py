@@ -40,7 +40,7 @@ class Transcriber:
         if self.__key:
             headers = {"Authorization": "Key " + self.__key}
         self.rate_limit()
-        r = requests.post(url, files=files, data=values, timeout=20, headers=headers)
+        r = requests.post(url, files=files, data=values, timeout=120, headers=headers)
         if r.status_code != 200:
             raise Exception("Can't upload '{}'".format(r.text))
         return r.json()["id"]
