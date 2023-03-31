@@ -2,6 +2,13 @@
 Transcribe a list of files audio files using intelektika.lt transcription service
 API: https://app.swaggerhub.com/apis/aireno/Transkipcija
 
+
+## Requirements
+
+- conda or python>=3.10
+- make
+- unzip
+
 ## Running
 
 ### prepare env
@@ -35,8 +42,7 @@ key?=
 make build
 ```
 
-## result
+## Result
 
 The script prepares transcriptions at `${work_dir}/trans.zip`
 ```
-
