@@ -134,13 +134,13 @@ def main(argv):
         start_thread(start)
 
     overall_progress = Progress()
-    overall_task = overall_progress.add_task("All Jobs", total=len(jobs))
+    overall_task = overall_progress.add_task("All Files", total=len(jobs))
     progress_group = Group(
         Panel(Group(progress)),
-        overall_progress,
+        Panel(Group(overall_progress)),
     )
 
-    with Live(progress_group, refresh_per_second=10):
+    with Live(progress_group, refresh_per_second=1):
         for i, j in enumerate(jobs):
             j.wait()
             overall_progress.update(overall_task, advance=1)
