@@ -5,7 +5,10 @@ import sys
 import threading
 from os.path import exists
 
-from tqdm import tqdm
+from rich.console import Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress
 
 from src.transcriber import Transcriber
 
@@ -24,8 +27,8 @@ class Work:
     def wait(self):
         return self.wait_queue.get()
 
-    def predict(self, trans) -> str:
-        self.str = predict(trans, self.file, self.file_out, self.file_out_sync)
+    def predict(self, trans, pb) -> str:
+        self.str = predict(trans, self.file, self.file_out, self.file_out_sync, pb)
         self.done()
 
 
@@ -40,13 +43,13 @@ def non_empty_file(file: str):
             return True
 
 
-def predict(trans, file, file_out, file_out_sync):
+def predict(trans, file, file_out, file_out_sync, update_f):
     global err_count
     if exists(file_out) and exists(file_out_sync):
         return "{} - exists".format(file_out)
     try:
         print("sending file %s" % file)
-        (txt, lat) = trans.predict(file)
+        (txt, lat) = trans.predict(file, update_f)
         with open(file_out, "w") as f:
             f.write(txt)
         with open(file_out_sync, "w") as f:
@@ -65,11 +68,16 @@ def main(argv):
     parser.add_argument("--in_f", nargs='?', required=True, help="List file")
     parser.add_argument("--out_dir", nargs='?', required=True, help="Output dir for transcriptions")
     parser.add_argument("--url", nargs='?', default="https://atpazinimas.intelektika.lt", help="Transcriber URL")
+    parser.add_argument("--model", nargs='?', type=str, default="ben", help="Transcriber model")
+    parser.add_argument("--speakers", nargs='?', type=str, default="", help="Speakers count")
+    parser.add_argument("--old_clean", nargs='?', type=int, default="0", help="Use old clean service")
     parser.add_argument("--key", nargs='?', required=False, help="Transcription API secret key")
     parser.add_argument("--workers", nargs='?', type=int, default=4, help="Workers count")
     args = parser.parse_args(args=argv)
 
-    trans = Transcriber(args.url, key=args.key)
+    trans = Transcriber(args.url, key=args.key, model=args.model, speakers=args.speakers, old_clean=args.old_clean)
+
+    progress = Progress()
 
     jobs = []
     with open(args.in_f, 'r') as in_f:
@@ -105,22 +113,42 @@ def main(argv):
     start_thread(add_jobs)
 
     def start():
+        task = progress.add_task("Transcribing", total=100)
         while True:
             _j = job_queue.get()
             if _j is None:
                 return
-            _j.predict(trans)
+
+            _f = os.path.basename(_j.file)
+            _f, _ = os.path.splitext(_f)
+
+            def update(st, name):
+                progress.update(task, description=f"{_f} - {name}")
+                progress.update(task, completed=st)
+
+            progress.update(task, description=f"tr{_f} - Uploading", total=100)
+
+            _j.predict(trans, update)
 
     for i in range(wc):
         start_thread(start)
 
-    with tqdm("transcribing", total=len(jobs)) as pbar:
+    overall_progress = Progress()
+    overall_task = overall_progress.add_task("All Jobs", total=len(jobs))
+    progress_group = Group(
+        Panel(Group(progress)),
+        overall_progress,
+    )
+
+    with Live(progress_group, refresh_per_second=10):
         for i, j in enumerate(jobs):
             j.wait()
-            pbar.update(1)
+            overall_progress.update(overall_task, advance=1)
             print("%s" % (j.str.replace("\n", " ")))
+
     for w in workers:
         w.join()
+
     with err_lock:
         if err_count > 0:
             print("Failed %d" % err_count)

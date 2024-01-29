@@ -6,19 +6,23 @@ from pyrate_limiter import RequestRate, Duration, Limiter
 
 
 class Transcriber:
-    def __init__(self, url: str, key: str = ""):
+    def __init__(self, url: str, key: str = "", model: str = "", speakers: str = "", old_clean: int = 0):
         self.__url = url
         self.__key = key
+        self.__model = model
+        self.__speakers = speakers
+        self.__old_clean = old_clean
         rate = RequestRate(10, Duration.SECOND)
         self.limiter = Limiter(rate)
 
-    def predict(self, file: str) -> (str, str):
+    def predict(self, file: str, update_f) -> (str, str):
         try:
             _id = self.upload(file)
             print("send " + _id)
             finished = False
             while not finished:
-                finished = self.is_finished(_id)
+                finished, st = self.is_finished(_id)
+                update_f(st[0], st[1])
                 if not finished:
                     time.sleep(1)
             res = self.get_result(_id, "resultFinal.txt")
@@ -34,7 +38,7 @@ class Transcriber:
         with open(file, 'rb') as f:
             files = {'file': (os.path.basename(file).replace("..", "."), f.read())}
         # values = {'recognizer': 'ben', 'numberOfSpeakers': '1'}
-        values = {'recognizer': 'ben'}
+        values = {'recognizer': self.__model, 'numberOfSpeakers': self.__speakers}
         url = "%s/ausis/transcriber/upload" % self.__url
         headers = {}
         if self.__key:
@@ -54,7 +58,7 @@ class Transcriber:
         st = r.json()
         if st.get("error", ""):
             raise Exception(st["error"])
-        return st["status"] == "COMPLETED"
+        return st["status"] == "COMPLETED", (st["progress"], st["status"])
 
     def get_result(self, _id: str, _file: str):
         url = "%s/ausis/result.service/result/%s/%s" % (self.__url, _id, _file)
@@ -66,6 +70,8 @@ class Transcriber:
 
     def clean(self, _id):
         url = "%s/ausis/clean.service/delete/%s" % (self.__url, _id)
+        if self.__old_clean > 0:
+            url = "%s/ausis/clean.service/%s" % (self.__url, _id)
         self.rate_limit()
         r = requests.delete(url, timeout=10)
         if r.status_code != 200:
