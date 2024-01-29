@@ -8,7 +8,7 @@ from os.path import exists
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress
+from rich.progress import Progress, TimeElapsedColumn
 
 from src.transcriber import Transcriber
 
@@ -133,7 +133,7 @@ def main(argv):
     for i in range(wc):
         start_thread(start)
 
-    overall_progress = Progress()
+    overall_progress = Progress(*Progress.get_default_columns(), TimeElapsedColumn())
     overall_task = overall_progress.add_task("All Files", total=len(jobs))
     progress_group = Group(
         Panel(Group(progress)),
