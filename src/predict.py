@@ -8,7 +8,7 @@ from os.path import exists
 from rich.console import Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress, TimeElapsedColumn
+from rich.progress import Progress, TimeElapsedColumn, MofNCompleteColumn
 
 from src.transcriber import Transcriber
 
@@ -77,8 +77,6 @@ def main(argv):
 
     trans = Transcriber(args.url, key=args.key, model=args.model, speakers=args.speakers, old_clean=args.old_clean)
 
-    progress = Progress()
-
     jobs = []
     with open(args.in_f, 'r') as in_f:
         for line in in_f:
@@ -112,6 +110,10 @@ def main(argv):
 
     start_thread(add_jobs)
 
+    progress = Progress()
+    overall_progress = Progress(*Progress.get_default_columns(), TimeElapsedColumn(), MofNCompleteColumn())
+    overall_task = overall_progress.add_task("All Files", total=len(jobs))
+
     def start():
         task = progress.add_task("Transcribing", total=100)
         while True:
@@ -127,23 +129,17 @@ def main(argv):
                 progress.update(task, completed=st)
 
             progress.update(task, description=f"tr{_f} - Uploading", total=100)
-
             _j.predict(trans, update)
+            overall_progress.update(overall_task, advance=1)
 
     for i in range(wc):
         start_thread(start)
 
-    overall_progress = Progress(*Progress.get_default_columns(), TimeElapsedColumn())
-    overall_task = overall_progress.add_task("All Files", total=len(jobs))
-    progress_group = Group(
-        Panel(Group(progress)),
-        Panel(Group(overall_progress)),
-    )
+    progress_group = Group(Panel(Group(progress)), Panel(Group(overall_progress)), )
 
-    with Live(progress_group, refresh_per_second=1):
-        for i, j in enumerate(jobs):
+    with Live(progress_group, refresh_per_second=4):
+        for j in jobs:
             j.wait()
-            overall_progress.update(overall_task, advance=1)
             print("%s" % (j.str.replace("\n", " ")))
 
     for w in workers:
